@@ -73,6 +73,15 @@ body.dark-mode .kpi-spark svg path[stroke="#1F5454"]{stroke:#9aa3ac!important}
 .kpi-bud{font-size:10.5px;color:var(--tx2);margin-top:9px;padding-top:8px;border-top:1px dashed #ececec;display:flex;justify-content:space-between;align-items:center;gap:6px}
 .kpi-bud .lbl{color:var(--tx3);font-size:9.5px;letter-spacing:0.04em;text-transform:uppercase}
 .kpi-bud .v{font-weight:600;font-variant-numeric:tabular-nums}
+/* Tarjetas sin grafico (ej. EPC Pipeline): contenido mas grande y centrado
+   verticalmente para que la tarjeta no se vea vacia frente a las que si
+   tienen sparkline. */
+.kpi-card.nochart{justify-content:center}
+.kpi-card.nochart .kpi-l{font-size:11px;margin-bottom:10px}
+.kpi-card.nochart .kpi-v{font-size:38px;margin-bottom:6px}
+.kpi-card.nochart .kpi-mom{font-size:13px;margin-top:4px}
+.kpi-card.nochart .kpi-mom .arr{font-size:11px}
+.kpi-card.nochart .kpi-bud{font-size:12.5px;margin-top:16px;padding-top:12px}
 .neg{color:var(--red)}
 .pos{color:var(--teal)}
 
@@ -562,7 +571,7 @@ footer.foot{margin-top:32px;padding-top:16px;border-top:1px solid var(--b);font-
 
 <footer class="foot">
   <div>VEMO · EV Fleets · Strictly Private &amp; Confidential</div>
-  <div>build 2026-08-25 12:23</div>
+  <div>build 2026-08-25 12:33</div>
 </footer>
 
 <script>
@@ -873,13 +882,14 @@ function renderKPICards(){
     const arrSym=momPct==null?'':(momPct>=0?'▲':'▼');
     // El margen izquierdo se pinta AMBER solo si HAY budget para la metrica Y el actual
     // esta PEOR que el budget (segun la direccion "mejor" de la metrica). Sin budget = default.
-    const cardCls=(budPct!=null && isNegBetter(budPct))?'amber':'';
+    let cardCls=(budPct!=null && isNegBetter(budPct))?'amber':'';
 
     // Serie para sparkline
     // Solo el anio en curso: el sparkline arranca en Ene del anio actual.
     // EPC Pipeline: sin grafico (a peticion) -- esta tarjeta no dibuja sparkline/leyenda/footer,
     // asi que el resto del contenido se acomoda con mas aire (ver margin-top:auto abajo).
     const noChart = (ki.keys && ki.keys[0] === 'epc_pipeline');
+    if(noChart) cardCls += ' nochart';
     const spStart = (typeof YTD_START !== 'undefined') ? Math.min(YTD_START, Math.max(0,_li)) : 0;
     const spSeries = (A||[]).slice(spStart, _li+1);
     const spBudget = (B && B.length) ? (B||[]).slice(spStart, _li+1) : null;
