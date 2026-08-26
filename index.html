@@ -522,7 +522,6 @@ footer.foot{margin-top:32px;padding-top:16px;border-top:1px solid var(--b);font-
     <select id="hl-month" style="font-family:inherit;font-size:13px;padding:8px 14px;border:1px solid var(--b);border-radius:6px;background:#fff;color:var(--forest);font-weight:600;cursor:pointer"></select>
     <span style="margin-left:auto;font-size:11px;color:var(--tx3)">Source: VEMO Monthly Financial Review (PDF/PPTX)</span>
   </div>
-  <div id="hl-coverage-note" style="font-size:11px;color:var(--tx3);margin:-8px 0 14px 2px"></div>
   <div id="hl-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px"></div>
 
   <!-- ========== P&L Commentary (editable via JSON, comparte selector de mes con H&L) ========== -->
@@ -574,7 +573,7 @@ footer.foot{margin-top:32px;padding-top:16px;border-top:1px solid var(--b);font-
 
 <footer class="foot">
   <div>VEMO · EV Fleets · Strictly Private &amp; Confidential</div>
-  <div>build 2026-08-25 22:38</div>
+  <div>build 2026-08-25 22:42</div>
 </footer>
 
 <script>
@@ -3065,38 +3064,23 @@ function renderMonthlyHL(){
     if(!sel) return;
     const MONTH_NUM = {Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12};
     function hasHL(m){ return !!(m && ((m.highlights && m.highlights.length > 0) || (m.lowlights && m.lowlights.length > 0))); }
-    function hasAuto(m){ return !!(m && (m.pnl_revenue || m.pnl_gp || m.pnl_ebitda || m.pnl_ni)); }
     function byDate(a,b){
       const [ma, ya] = a.split('-'); const [mb, yb] = b.split('-');
       const yA = 2000 + parseInt(ya), yB = 2000 + parseInt(yb);
       if(yA !== yB) return yA - yB;
       return (MONTH_NUM[ma]||0) - (MONTH_NUM[mb]||0);
     }
-    const allKeys = Object.keys(MONTHLY_HL || {})
+    // Solo listar meses con Highlights & Lowlights realmente capturados en
+    // evf_highlights.json -- nada de meses que solo traigan el P&L Commentary
+    // auto-generado (eso se ve abajo para el mes elegido, pero no debe
+    // aparecer como opcion propia en el selector).
+    const keys = Object.keys(MONTHLY_HL || {})
       .filter(k => !k.startsWith('_'))
       .filter(k => /^[A-Z][a-z]{2}-\d{2}$/.test(k))
-      .filter(k => hasHL(MONTHLY_HL[k]) || hasAuto(MONTHLY_HL[k]));
-    // Separar meses con H&L curado de meses que solo traen P&L Commentary
-    // auto-generado, y agruparlos en el <select> para que sea obvio por que
-    // algunos meses se ven "vacios" (ver reclamo: "solo hay algunos meses
-    // con HL y LL y commentary").
-    const withHL = allKeys.filter(k => hasHL(MONTHLY_HL[k])).sort(byDate);
-    const autoOnly = allKeys.filter(k => !hasHL(MONTHLY_HL[k])).sort(byDate);
-    let optHtml = '';
-    if(withHL.length) optHtml += '<optgroup label="Highlights &amp; Lowlights captured">'
-      + withHL.map(k => '<option value="'+k+'">'+k+'</option>').join('') + '</optgroup>';
-    if(autoOnly.length) optHtml += '<optgroup label="P&amp;L Commentary only (no H&amp;L yet)">'
-      + autoOnly.map(k => '<option value="'+k+'">'+k+'</option>').join('') + '</optgroup>';
-    sel.innerHTML = optHtml;
-    const keys = withHL.concat(autoOnly);
-    // Preferir el ultimo mes con H&L realmente capturados; si no hay, el ultimo disponible
-    if(keys.length) sel.value = withHL.length ? withHL[withHL.length-1] : autoOnly[autoOnly.length-1];
-    const noteEl = document.getElementById('hl-coverage-note');
-    if(noteEl){
-      noteEl.textContent = keys.length
-        ? (withHL.length + ' of ' + keys.length + ' months have curated Highlights & Lowlights — the rest show auto-generated P&L Commentary only.')
-        : '';
-    }
+      .filter(k => hasHL(MONTHLY_HL[k]))
+      .sort(byDate);
+    sel.innerHTML = keys.map(k => '<option value="'+k+'">'+k+'</option>').join('');
+    if(keys.length) sel.value = keys[keys.length-1];
     sel.addEventListener('change', renderMonthlyHL);
     renderMonthlyHL();
   }
