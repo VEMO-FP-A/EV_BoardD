@@ -573,7 +573,7 @@ footer.foot{margin-top:32px;padding-top:16px;border-top:1px solid var(--b);font-
 
 <footer class="foot">
   <div>VEMO · EV Fleets · Strictly Private &amp; Confidential</div>
-  <div>build 2026-08-25 22:42</div>
+  <div>build 2026-08-27 12:52</div>
 </footer>
 
 <script>
@@ -3024,13 +3024,14 @@ function renderMonthlyHL(){
   } else {
   function colorize(text, isGood){
     if(!text) return '';
-    const cls = isGood ? 'hl-g' : 'hl-r';
+    // Color by the actual sign of each figure (verde = variacion positiva, rojo = negativa),
+    // no por si el parrafo esta en Highlights o Lowlights.
     let out = text;
-    out = out.replace(/(\(\$[\d,]+\.?\d*[mMkK]?\))/g, '<span class="'+cls+'">$1</span>');
-    out = out.replace(/(\$[\d,]+\.?\d*[mMkK]?)/g, '<span class="'+cls+'">$1</span>');
-    out = out.replace(/([+\-]\d+\.?\d*%)/g, '<span class="'+cls+'">$1</span>');
-    out = out.replace(/(?<![\d.])(\d+\.?\d*%)/g, '<span class="'+cls+'">$1</span>');
-    out = out.replace(/([+\-]?\d+\s*bps)/gi, '<span class="'+cls+'">$1</span>');
+    out = out.replace(/\(([+\-])\$[\d,]+\.?\d*[mMkK]?\)|(\(\$[\d,]+\.?\d*[mMkK]?\))|([+\-])\$[\d,]+\.?\d*[mMkK]?|([+\-])\d+\.?\d*%|([+\-])\d+\s*bps/gi, function(m, s1, plainParen, s2, s3, s4){
+      const sign = s1 || s2 || s3 || s4;
+      const cls = plainParen ? 'hl-r' : (sign === '+' ? 'hl-g' : 'hl-r');
+      return '<span class="'+cls+'">'+m+'</span>';
+    });
     return out;
   }
   let hl = '<div class="hl-card hl"><div class="hd">▲ Highlights</div>';
