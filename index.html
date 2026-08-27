@@ -73,15 +73,10 @@ body.dark-mode .kpi-spark svg path[stroke="#1F5454"]{stroke:#9aa3ac!important}
 .kpi-bud{font-size:10.5px;color:var(--tx2);margin-top:9px;padding-top:8px;border-top:1px dashed #ececec;display:flex;justify-content:space-between;align-items:center;gap:6px}
 .kpi-bud .lbl{color:var(--tx3);font-size:9.5px;letter-spacing:0.04em;text-transform:uppercase}
 .kpi-bud .v{font-weight:600;font-variant-numeric:tabular-nums}
-/* Tarjetas sin grafico (ej. EPC Pipeline): contenido mas grande y centrado
-   verticalmente para que la tarjeta no se vea vacia frente a las que si
-   tienen sparkline. */
-.kpi-card.nochart{justify-content:center}
-.kpi-card.nochart .kpi-l{font-size:11px;margin-bottom:10px}
-.kpi-card.nochart .kpi-v{font-size:38px;margin-bottom:6px}
-.kpi-card.nochart .kpi-mom{font-size:13px;margin-top:4px}
-.kpi-card.nochart .kpi-mom .arr{font-size:11px}
-.kpi-card.nochart .kpi-bud{font-size:12.5px;margin-top:16px;padding-top:12px}
+/* Tarjetas sin grafico (ej. EPC Pipeline): mismo tamano/tipografia que el
+   resto de las mini cards; el espacio del sparkline/leyenda/footer se
+   reserva pero queda invisible (ver renderKPICards) para que la tarjeta
+   ocupe exactamente el mismo alto que sus vecinas. */
 .neg{color:var(--red)}
 .pos{color:var(--teal)}
 
@@ -573,7 +568,7 @@ footer.foot{margin-top:32px;padding-top:16px;border-top:1px solid var(--b);font-
 
 <footer class="foot">
   <div>VEMO · EV Fleets · Strictly Private &amp; Confidential</div>
-  <div>build 2026-08-27 15:49</div>
+  <div>build 2026-08-27 15:50</div>
 </footer>
 
 <script>
@@ -888,70 +883,68 @@ function renderKPICards(){
 
     // Serie para sparkline
     // Solo el anio en curso: el sparkline arranca en Ene del anio actual.
-    // EPC Pipeline: sin grafico (a peticion) -- esta tarjeta no dibuja sparkline/leyenda/footer,
-    // asi que el resto del contenido se acomoda con mas aire (ver margin-top:auto abajo).
+    // EPC Pipeline: sin grafico (a peticion) -- esta tarjeta no dibuja la linea de
+    // tendencia, pero SI reserva el mismo espacio (oculto con visibility:hidden) que
+    // el resto de las tarjetas, para que todas midan exactamente lo mismo.
     const noChart = (ki.keys && ki.keys[0] === 'epc_pipeline');
     if(noChart) cardCls += ' nochart';
     const spStart = (typeof YTD_START !== 'undefined') ? Math.min(YTD_START, Math.max(0,_li)) : 0;
     const spSeries = (A||[]).slice(spStart, _li+1);
     const spBudget = (B && B.length) ? (B||[]).slice(spStart, _li+1) : null;
-    let sparkline = '', legendSlot = '', sparkFooter = '';
-    if(!noChart){
-      sparkline = _kpiSparkline(spSeries, spBudget, 260, 50, spStart);
-      // Rango de valores (min-max) formateado corto
-      const spVals = spSeries.filter(v => v != null && !isNaN(v));
-      let rangeTxt = '';
-      if(spVals.length){
-        const mn = Math.min(...spVals), mx = Math.max(...spVals);
-        function fmtRange(v){
-          if(v == null || isNaN(v)) return '';
-          if(ki && ki.type === 'pct'){
-            const pct = Math.abs(v) <= 1 ? v*100 : v;
-            return pct.toFixed(0) + '%';
-          }
-          // KPIs de unidades (vehiculos): enteros con coma, nunca "2k"
-          if(ki && ki.fmt === 'int') return Math.round(v).toLocaleString();
-          const a = Math.abs(v);
-          if(a >= 1e9) return _withCommas(v/1e9,1)+'B';
-          if(a >= 1e6) return _withCommas(v/1e6,1)+'M';
-          if(a >= 1e3) return _withCommas(v/1e3,0)+'k';
-          if(a >= 100) return Math.round(v).toLocaleString();
-          if(a >= 10) return v.toFixed(1);
-          return v.toFixed(1);
+    const sparkline = noChart ? '' : _kpiSparkline(spSeries, spBudget, 260, 50, spStart);
+    // Rango de valores (min-max) formateado corto
+    const spVals = spSeries.filter(v => v != null && !isNaN(v));
+    let rangeTxt = '';
+    if(spVals.length){
+      const mn = Math.min(...spVals), mx = Math.max(...spVals);
+      function fmtRange(v){
+        if(v == null || isNaN(v)) return '';
+        if(ki && ki.type === 'pct'){
+          const pct = Math.abs(v) <= 1 ? v*100 : v;
+          return pct.toFixed(0) + '%';
         }
-        rangeTxt = fmtRange(mn) + ' – ' + fmtRange(mx);
+        // KPIs de unidades (vehiculos): enteros con coma, nunca "2k"
+        if(ki && ki.fmt === 'int') return Math.round(v).toLocaleString();
+        const a = Math.abs(v);
+        if(a >= 1e9) return _withCommas(v/1e9,1)+'B';
+        if(a >= 1e6) return _withCommas(v/1e6,1)+'M';
+        if(a >= 1e3) return _withCommas(v/1e3,0)+'k';
+        if(a >= 100) return Math.round(v).toLocaleString();
+        if(a >= 10) return v.toFixed(1);
+        return v.toFixed(1);
       }
-      const dateRangeTxt = mlblShort(spStart) + ' – ' + mlblShort(_li);
-      sparkFooter = '<div style="display:flex;justify-content:space-between;font-size:9.5px;color:var(--tx3);margin-top:4px;padding:0 2px">' +
-        '<span>' + rangeTxt + '</span>' +
-        '<span>' + dateRangeTxt + '</span>' +
-        '</div>';
-
-      // Mini legend (Actuals / Budget) — visible sólo cuando hay serie de budget
-      const hasBud = spBudget && spBudget.some(function(v){ return v != null && !isNaN(v) && v !== 0; });
-      const legendItemActuals = '<span style="display:inline-flex;align-items:center;gap:5px">' +
-          '<svg width="18" height="6" style="display:block"><line x1="0" y1="3" x2="18" y2="3" stroke="#11ABAB" stroke-width="1.8" stroke-linecap="round"/></svg>' +
-          '<span>Actuals</span>' +
-        '</span>';
-      const legendItemBudget = hasBud ? (
-        '<span style="display:inline-flex;align-items:center;gap:5px">' +
-          '<svg width="18" height="6" style="display:block"><line x1="0" y1="3" x2="18" y2="3" stroke="#1F5454" stroke-width="1.2" stroke-dasharray="4,3" stroke-linecap="round"/></svg>' +
-          '<span>Budget</span>' +
-        '</span>'
-      ) : '';
-      legendSlot = '<div id="ksl-'+i+'" class="kpi-spark-legend" style="display:flex;gap:12px;justify-content:flex-start;align-items:center;font-family:\'Space Grotesk\',sans-serif;font-size:8px;color:#888;margin-top:2px;padding:0 2px">' +
-          legendItemActuals + legendItemBudget +
-        '</div>';
+      rangeTxt = fmtRange(mn) + ' – ' + fmtRange(mx);
     }
+    const dateRangeTxt = mlblShort(spStart) + ' – ' + mlblShort(_li);
+    const sparkFooter = '<div style="display:flex;justify-content:space-between;font-size:9.5px;color:var(--tx3);margin-top:4px;padding:0 2px'+(noChart?';visibility:hidden':'')+'">' +
+      '<span>' + rangeTxt + '</span>' +
+      '<span>' + dateRangeTxt + '</span>' +
+      '</div>';
+
+    // Mini legend (Actuals / Budget) — visible sólo cuando hay serie de budget
+    const hasBud = spBudget && spBudget.some(function(v){ return v != null && !isNaN(v) && v !== 0; });
+    const legendItemActuals = '<span style="display:inline-flex;align-items:center;gap:5px">' +
+        '<svg width="18" height="6" style="display:block"><line x1="0" y1="3" x2="18" y2="3" stroke="#11ABAB" stroke-width="1.8" stroke-linecap="round"/></svg>' +
+        '<span>Actuals</span>' +
+      '</span>';
+    const legendItemBudget = (hasBud && !noChart) ? (
+      '<span style="display:inline-flex;align-items:center;gap:5px">' +
+        '<svg width="18" height="6" style="display:block"><line x1="0" y1="3" x2="18" y2="3" stroke="#1F5454" stroke-width="1.2" stroke-dasharray="4,3" stroke-linecap="round"/></svg>' +
+        '<span>Budget</span>' +
+      '</span>'
+    ) : '';
+    const legendSlot = '<div id="ksl-'+i+'" class="kpi-spark-legend" style="display:flex;gap:12px;justify-content:flex-start;align-items:center;font-family:\'Space Grotesk\',sans-serif;font-size:8px;color:#888;margin-top:2px;padding:0 2px'+(noChart?';visibility:hidden':'')+'">' +
+        legendItemActuals + legendItemBudget +
+      '</div>';
 
     return '<div class="kpi-card '+cardCls+'">'+
       '<div class="kpi-l">'+ki.l+'</div>'+
       '<div class="kpi-v">'+fmtVal(val,ki)+'</div>'+
       '<div class="kpi-mom"><span class="arr '+momCls+'">'+arrSym+'</span> <span class="'+momCls+'">'+momTxt+'</span> <span style="color:var(--tx3)">vs '+mlblShort(_prev)+'</span></div>'+
       (valBud?
-        '<div class="kpi-bud"'+(noChart?' style="margin-top:auto"':'')+'><span><span class="lbl">vs Budget</span> '+fmtVal(valBud,ki)+'</span><span class="v '+budCls+'">'+budTxt+'</span></div>'
+        '<div class="kpi-bud"><span><span class="lbl">vs Budget</span> '+fmtVal(valBud,ki)+'</span><span class="v '+budCls+'">'+budTxt+'</span></div>'
        :'')+
-      (noChart? '' : '<div class="kpi-spark">'+sparkline+'</div>'+legendSlot+sparkFooter)+
+      '<div class="kpi-spark">'+sparkline+'</div>'+legendSlot+sparkFooter+
     '</div>';
   }).join('');
 }
