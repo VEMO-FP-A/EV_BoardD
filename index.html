@@ -514,7 +514,7 @@ footer.foot{margin-top:32px;padding-top:16px;border-top:1px solid var(--b);font-
 
 <footer class="foot">
   <div>VEMO · EV Fleets · Strictly Private &amp; Confidential</div>
-  <div>build 2026-09-23 23:39</div>
+  <div>build 2026-09-23 18:28</div>
 </footer>
 
 <script>
@@ -1358,13 +1358,13 @@ const RATIOS = {
   fin: [
     {l:'Revenues',          keys:['revenue'],        unit:'MXN$m', type:'money', agg:'sum', fmt:'mm'},
     {l:'Gross Profit',      keys:['gross_profit'],   unit:'MXN$m', type:'money', agg:'sum', fmt:'mm'},
-    {l:'Gross Margin',      keys:['gross_margin'],   unit:'%',     type:'pct',   agg:'avg'},
+    {l:'Gross Margin',      keys:['gross_margin'],   unit:'%',     type:'pct',   agg:'avg', ytdNum:'gross_profit', ytdDen:'revenue'},
     {l:'EBITDA',            keys:['ebitda'],         unit:'MXN$m', type:'money', agg:'sum', fmt:'mm'},
-    {l:'EBITDA Margin',     keys:['ebitda_margin'],  unit:'%',     type:'pct',   agg:'avg'},
+    {l:'EBITDA Margin',     keys:['ebitda_margin'],  unit:'%',     type:'pct',   agg:'avg', ytdNum:'ebitda',       ytdDen:'revenue'},
     {l:'EBIT',              keys:['ebit'],           unit:'MXN$m', type:'money', agg:'sum', fmt:'mm'},
-    {l:'EBIT Margin',       keys:['ebit_margin'],    unit:'%',     type:'pct',   agg:'avg'},
+    {l:'EBIT Margin',       keys:['ebit_margin'],    unit:'%',     type:'pct',   agg:'avg', ytdNum:'ebit',         ytdDen:'revenue'},
     {l:'Net Income',        keys:['net_income'],     unit:'MXN$m', type:'money', agg:'sum', fmt:'mm'},
-    {l:'Net Income Margin', keys:['ni_margin'],      unit:'%',     type:'pct',   agg:'avg'},
+    {l:'Net Income Margin', keys:['ni_margin'],      unit:'%',     type:'pct',   agg:'avg', ytdNum:'net_income',   ytdDen:'revenue'},
   ],
 };
 
@@ -1507,17 +1507,28 @@ function renderRatioExpandable(targetId, list, sectionTitle){
       }
       return v;
     }
-    function getYtd(arrIn){
+    // YTD real (acumulado del rango), NO promedio mensual:
+    //  - montos (agg 'sum'): suma de los meses del rango
+    //  - margenes con ytdNum/ytdDen: suma(numerador) / suma(denominador),
+    //    mismo calculo que la columna YTD de la tabla P&L
+    //  - saldos (agg 'eop'): valor al cierre del rango (sin cambio)
+    function getYtd(arrIn, isBud){
       let v;
+      if(ki.ytdNum && ki.ytdDen){
+        const nArr = isBud ? barrCand([ki.ytdNum]) : arrCand([ki.ytdNum]);
+        const dArr = isBud ? barrCand([ki.ytdDen]) : arrCand([ki.ytdDen]);
+        const den = sum(dArr, RS, RE);
+        return den ? sum(nArr, RS, RE)/den : 0;
+      }
       if(ki.agg==='eop') v = eop(arrIn, RE);
       else if(ki.agg==='avg') v = avg(arrIn, RS, RE);
-      else { const m=RE-RS+1; v = m>0? sum(arrIn,RS,RE)/m : 0; }
+      else v = sum(arrIn, RS, RE);
       if(ki.add){
         for(const k2 of ki.add){
           const A2 = D[k2]||[];
           if(ki.agg==='eop') v += eop(A2, RE);
           else if(ki.agg==='avg') v += avg(A2, RS, RE);
-          else { const m=RE-RS+1; v += m>0? sum(A2,RS,RE)/m : 0; }
+          else v += sum(A2, RS, RE);
         }
       }
       return v;
@@ -1579,7 +1590,7 @@ function renderRatioExpandable(targetId, list, sectionTitle){
           varRow += '<td style="color:var(--tx3)">—</td>';
         }
       }
-      const ytdA = getYtd(A), ytdB = getYtd(B);
+      const ytdA = getYtd(A), ytdB = getYtd(B, true);
       budRow += '<td style="color:var(--tx3)"><b>'+(ytdB?fmtVal(ytdB,ki):'—')+'</b></td></tr>';
       let ytdVarTxt='—', ytdVarNeg=false;
       if(ytdB){
