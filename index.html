@@ -514,7 +514,7 @@ footer.foot{margin-top:32px;padding-top:16px;border-top:1px solid var(--b);font-
 
 <footer class="foot">
   <div>VEMO · EV Fleets · Strictly Private &amp; Confidential</div>
-  <div>build 2026-09-23 18:28</div>
+  <div>build 2026-09-23 19:02</div>
 </footer>
 
 <script>
@@ -1350,20 +1350,20 @@ const RATIOS = {
   // Main Commercial KPIs — exactly the "EVF – Main Commercial KPIs" slide
   main: [
     {l:'EPC Sales (Third Party)',   keys:['epc_sales_3p'],       unit:'MXN$m', type:'money', agg:'sum', fmt:'mm'},
-    {l:'EPC Backlog',               keys:['epc_backlog'],        unit:'MXN$m', type:'money', agg:'eop', fmt:'mm'},
-    {l:'EPC Pipeline',              keys:['epc_pipeline'],       unit:'MXN$m', type:'money', agg:'eop', fmt:'mm'},
-    {l:'ZEE Monitored LTO Vehicles',keys:['zee_monitored_lto'],  unit:'#',     type:'num',   agg:'eop', fmt:'int'},
-    {l:'ZEE Total Monitored Vehicles',keys:['zee_total_monitored'],unit:'#',   type:'num',   agg:'eop', fmt:'int'},
+    {l:'EPC Backlog',               keys:['epc_backlog'],        unit:'MXN$m', type:'money', agg:'eop', fmt:'mm', ytdAvg:true},
+    {l:'EPC Pipeline',              keys:['epc_pipeline'],       unit:'MXN$m', type:'money', agg:'eop', fmt:'mm', ytdAvg:true},
+    {l:'ZEE Monitored LTO Vehicles',keys:['zee_monitored_lto'],  unit:'#',     type:'num',   agg:'eop', fmt:'int', ytdAvg:true},
+    {l:'ZEE Total Monitored Vehicles',keys:['zee_total_monitored'],unit:'#',   type:'num',   agg:'eop', fmt:'int', ytdAvg:true},
   ],
   fin: [
-    {l:'Revenues',          keys:['revenue'],        unit:'MXN$m', type:'money', agg:'sum', fmt:'mm'},
-    {l:'Gross Profit',      keys:['gross_profit'],   unit:'MXN$m', type:'money', agg:'sum', fmt:'mm'},
+    {l:'Revenues',          keys:['revenue'],        unit:'MXN$m', type:'money', agg:'sum', fmt:'mm', ytdSum:true},
+    {l:'Gross Profit',      keys:['gross_profit'],   unit:'MXN$m', type:'money', agg:'sum', fmt:'mm', ytdSum:true},
     {l:'Gross Margin',      keys:['gross_margin'],   unit:'%',     type:'pct',   agg:'avg', ytdNum:'gross_profit', ytdDen:'revenue'},
-    {l:'EBITDA',            keys:['ebitda'],         unit:'MXN$m', type:'money', agg:'sum', fmt:'mm'},
+    {l:'EBITDA',            keys:['ebitda'],         unit:'MXN$m', type:'money', agg:'sum', fmt:'mm', ytdSum:true},
     {l:'EBITDA Margin',     keys:['ebitda_margin'],  unit:'%',     type:'pct',   agg:'avg', ytdNum:'ebitda',       ytdDen:'revenue'},
-    {l:'EBIT',              keys:['ebit'],           unit:'MXN$m', type:'money', agg:'sum', fmt:'mm'},
+    {l:'EBIT',              keys:['ebit'],           unit:'MXN$m', type:'money', agg:'sum', fmt:'mm', ytdSum:true},
     {l:'EBIT Margin',       keys:['ebit_margin'],    unit:'%',     type:'pct',   agg:'avg', ytdNum:'ebit',         ytdDen:'revenue'},
-    {l:'Net Income',        keys:['net_income'],     unit:'MXN$m', type:'money', agg:'sum', fmt:'mm'},
+    {l:'Net Income',        keys:['net_income'],     unit:'MXN$m', type:'money', agg:'sum', fmt:'mm', ytdSum:true},
     {l:'Net Income Margin', keys:['ni_margin'],      unit:'%',     type:'pct',   agg:'avg', ytdNum:'net_income',   ytdDen:'revenue'},
   ],
 };
@@ -1507,12 +1507,16 @@ function renderRatioExpandable(targetId, list, sectionTitle){
       }
       return v;
     }
-    // YTD real (acumulado del rango), NO promedio mensual:
-    //  - montos (agg 'sum'): suma de los meses del rango
+    // Financial metrics (RATIOS.fin): YTD real del rango, NO promedio mensual:
+    //  - montos con ytdSum: suma de los meses del rango
     //  - margenes con ytdNum/ytdDen: suma(numerador) / suma(denominador),
     //    mismo calculo que la columna YTD de la tabla P&L
-    //  - saldos (agg 'eop'): valor al cierre del rango (sin cambio)
+    // Main Metrics con ytdAvg (Backlog, Pipeline, ZEE): el acumulado es el PROMEDIO
+    //    mensual del rango, igual que la columna "YTD Avg." del reporte EVF.
+    // El resto de metricas sigue exactamente igual que antes.
     function getYtd(arrIn, isBud){
+      // YTD = anio en curso siempre (aunque la tabla muestre 2025-2026)
+      const RS = (typeof YTD_START !== 'undefined') ? YTD_START : 0;
       let v;
       if(ki.ytdNum && ki.ytdDen){
         const nArr = isBud ? barrCand([ki.ytdNum]) : arrCand([ki.ytdNum]);
@@ -1520,15 +1524,19 @@ function renderRatioExpandable(targetId, list, sectionTitle){
         const den = sum(dArr, RS, RE);
         return den ? sum(nArr, RS, RE)/den : 0;
       }
-      if(ki.agg==='eop') v = eop(arrIn, RE);
+      if(ki.ytdAvg) v = avg(arrIn, RS, RE);
+      else if(ki.agg==='eop') v = eop(arrIn, RE);
       else if(ki.agg==='avg') v = avg(arrIn, RS, RE);
-      else v = sum(arrIn, RS, RE);
+      else if(ki.ytdSum) v = sum(arrIn, RS, RE);
+      else { const m=RE-RS+1; v = m>0? sum(arrIn,RS,RE)/m : 0; }
       if(ki.add){
         for(const k2 of ki.add){
           const A2 = D[k2]||[];
-          if(ki.agg==='eop') v += eop(A2, RE);
+          if(ki.ytdAvg) v += avg(A2, RS, RE);
+          else if(ki.agg==='eop') v += eop(A2, RE);
           else if(ki.agg==='avg') v += avg(A2, RS, RE);
-          else v += sum(A2, RS, RE);
+          else if(ki.ytdSum) v += sum(A2, RS, RE);
+          else { const m=RE-RS+1; v += m>0? sum(A2,RS,RE)/m : 0; }
         }
       }
       return v;
@@ -1557,7 +1565,10 @@ function renderRatioExpandable(targetId, list, sectionTitle){
     // Inner table: rango variable segun toggle (YTD o historico)
     let monthsCols = '<tr><th>Concept</th>';
     for(let i=RS; i<=RE; i++) monthsCols += '<th>'+mlblShort(i)+'</th>';
-    monthsCols += '<th>'+(KPI_RANGE==='ytd'?'YTD':'Total')+'</th></tr>';
+    // "(avg)": el acumulado de esta metrica es un PROMEDIO mensual (mismas reglas que getYtd).
+    // Financial metrics (ytdSum / ytdNum-ytdDen) y saldos EoP no llevan la aclaracion.
+    const _ytdAvg = !!ki.ytdAvg || (!(ki.ytdNum && ki.ytdDen) && ki.agg!=='eop' && (ki.agg==='avg' || !ki.ytdSum));
+    monthsCols += '<th>YTD'+(_ytdAvg?' (avg)':'')+'</th></tr>';
     let actualRow = '<tr><td><b>Actual</b> ('+ki.unit+')</td>';
     for(let i=RS; i<=RE; i++) actualRow += '<td>'+fmtVal(getV(A,i),ki)+'</td>';
     actualRow += '<td><b>'+fmtVal(getYtd(A),ki)+'</b></td></tr>';
